@@ -1,3 +1,7 @@
+/**
+ * @file    stm_lcd_spi_f4.c
+ * @brief   实现 STM32F4 同步 SPI 传输及适配生命周期。
+ */
 #include "stm_lcd_spi_f4.h"
 #include <limits.h>
 #include <string.h>

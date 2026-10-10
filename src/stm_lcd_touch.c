@@ -1,3 +1,7 @@
+/**
+ * @file    stm_lcd_touch.c
+ * @brief   实现触摸快照、坐标变换及输入借用。
+ */
 #include "stm_lcd_impl.h"
 
 stm_err_t stm_lcd_touch_base_init(stm_lcd_touch_handle_t t,

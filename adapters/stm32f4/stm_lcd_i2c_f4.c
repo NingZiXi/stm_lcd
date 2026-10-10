@@ -1,3 +1,7 @@
+/**
+ * @file    stm_lcd_i2c_f4.c
+ * @brief   实现 STM32F4 独立 I2C 写读及连接探测。
+ */
 #include "stm_lcd_i2c_f4.h"
 #include <limits.h>
 #include <string.h>
@@ -21,7 +25,7 @@ static stm_err_t read(void *context, uint8_t *data, size_t n)
     stm_lcd_i2c_f4_t *t = context;
     if (n > UINT16_MAX)
         return STM_ERR_OUT_OF_RANGE;
-    /* Two independent raw transactions with STOP, never HAL_I2C_Mem_Read. */
+    // 独立原始事务保留 STOP，不使用寄存器读取。
     return from_hal(HAL_I2C_Master_Receive(t->config.i2c, t->config.address_7bit << 1, data,
                                            (uint16_t)n, t->config.timeout_ms));
 }

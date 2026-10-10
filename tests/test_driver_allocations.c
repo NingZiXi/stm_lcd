@@ -1,3 +1,7 @@
+/**
+ * @file    test_driver_allocations.c
+ * @brief   验证组件主机回归，不替代实板验收。
+ */
 #include "stm_lcd_impl.h"
 #include "stm_lcd_axs15231b.h"
 #include "stm_lcd_touch_axs15231b.h"
@@ -85,14 +89,14 @@ int main(void)
     unsigned freed = releases;
     assert(lcd_axs15231b_create(&pc, &other) == STM_ERR_INVALID_STATE);
     assert(!other && live == 1 && releases == freed + 1 && io.borrowers == 1);
-    /* An existing output is preserved, never leaked or silently replaced. */
+    // 非空输出拒绝覆盖。
     stm_lcd_panel_handle_t saved = panel;
     assert(lcd_axs15231b_create(&pc, &panel) == STM_ERR_INVALID_STATE);
     assert(panel == saved && live == 1);
     assert(stm_lcd_panel_delete(&panel) == STM_OK);
     assert(!panel && !live && !io.borrowers && !io.complete);
 
-    tc.coordinates.x_max = 0; /* Failure after allocation must release the object. */
+    tc.coordinates.x_max = 0; // 分配后的失败须回滚对象。
     freed = releases;
     assert(lcd_touch_axs15231b_create(&tc, &touch) == STM_ERR_INVALID_CONFIG);
     assert(!touch && !live && releases == freed + 1 && !io.borrowers);

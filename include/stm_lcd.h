@@ -1,4 +1,7 @@
-/** @file stm_lcd.h @brief Unified display-domain IO, panel and touch interfaces. */
+/**
+ * @file    stm_lcd.h
+ * @brief   汇总显示领域 IO、面板与触摸接口。
+ */
 #ifndef STM_LCD_H
 #define STM_LCD_H
 #include "stm_lcd_io.h"

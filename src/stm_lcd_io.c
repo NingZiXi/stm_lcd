@@ -1,3 +1,7 @@
+/**
+ * @file    stm_lcd_io.c
+ * @brief   实现 IO 生命周期及安全完成分发。
+ */
 #include "stm_lcd_impl.h"
 #include <string.h>
 
@@ -74,7 +78,7 @@ stm_err_t stm_lcd_io_tx_color_async(stm_lcd_io_handle_t io, uint8_t cmd, const v
         return STM_ERR_NOT_SUPPORTED;
     io->pending = 1;
     err = io->ops->tx_color_async(io->context, cmd, data, n);
-    /* Defensive fallback: a broken adapter must not release a live DMA buffer. */
+    // 硬件仍忙时保留像素所有权。
     if (err != STM_OK && io->pending && (!io->ops->busy || !io->ops->busy(io->context)))
         io->pending = 0;
     return err;

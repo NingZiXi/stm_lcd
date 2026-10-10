@@ -1,4 +1,8 @@
-/** Optional STM32F4 normal-mode TX DMA; ISR mailbox, main-loop ownership. */
+/**
+ * @file    stm_lcd_spi_f4_dma.c
+ * @brief   实现 STM32F4 DMA 状态邮箱及主循环安全完成。
+ */
+
 #include "stm_lcd_spi_f4.h"
 #include <limits.h>
 
@@ -28,9 +32,7 @@ static void unmask_irqs(stm_lcd_spi_f4_t *t)
     HAL_NVIC_EnableIRQ(t->config.spi_irq);
 }
 
-/* SysTick remains enabled during HAL's bounded abort. Even an error callback
- * may have already cleared TXDMAEN: explicitly stop a still-enabled stream.
- * If hardware refuses to stop, reset rather than release a borrowed buffer. */
+// 有界终止时保留 SysTick，显式停止 DMA stream。
 static int stop_transfer(stm_lcd_spi_f4_t *t)
 {
     HAL_StatusTypeDef err = HAL_SPI_Abort(t->config.spi);
@@ -46,7 +48,7 @@ static int stop_transfer(stm_lcd_spi_f4_t *t)
     if (t->config.spi->hdmatx->Instance->CR & DMA_SxCR_EN)
     {
         NVIC_SystemReset();
-        return 0; /* Reset never returns on the MCU; retain ownership in mocks. */
+        return 0; // 停止失败时保持像素所有权。
     }
     return 1;
 }
@@ -62,7 +64,7 @@ stm_err_t stm_lcd_spi_f4_tx_color_async(void *io, uint8_t command, const void *p
         return STM_ERR_INVALID_ARG;
     if (bytes > UINT16_MAX)
         return STM_ERR_OUT_OF_RANGE;
-    /* Reject inaccessible memory before selecting the bus, including CCM. */
+    // 选择总线前拒绝不可 DMA 访问的内存，包括 CCM。
     uintptr_t address = (uintptr_t)pixels;
     if (address < t->config.dma_memory_begin || address >= t->config.dma_memory_end ||
         bytes > t->config.dma_memory_end - address)
@@ -80,7 +82,7 @@ stm_err_t stm_lcd_spi_f4_tx_color_async(void *io, uint8_t command, const void *p
     clear_pending_irqs(t);
     t->started = HAL_GetTick();
     t->irq_result = 0;
-    t->active = 1; /* Publish before enabling DMA: an IRQ may be immediate. */
+    t->active = 1; // 启动 DMA 前发布状态，IRQ 可能立即到达。
     __DMB();
     status = HAL_SPI_Transmit_DMA(t->config.spi, (uint8_t *)pixels, (uint16_t)bytes);
     if (status != HAL_OK)
@@ -100,8 +102,7 @@ stm_err_t stm_lcd_spi_f4_tx_color_async(void *io, uint8_t command, const void *p
     return STM_OK;
 }
 
-/* HAL's normal-mode TX callback is after TXE/BSY and State=READY. These
- * callbacks only publish a mailbox; no LVGL, logging, I2C or CS changes. */
+// IRQ 仅记录邮箱，不访问 LVGL、I2C 或 CS。
 void stm_lcd_spi_f4_irq_complete(stm_lcd_spi_f4_t *t, SPI_HandleTypeDef *spi)
 {
     if (!t || !t->initialized || spi != t->config.spi)
@@ -148,7 +149,7 @@ void stm_lcd_spi_f4_poll(stm_lcd_spi_f4_t *t)
     if (!transfer_finished(t, result) && result != 2 && elapsed < t->config.timeout_ms)
         return;
     mask_irqs(t);
-    /* Re-read after masking: completion/error may have arrived since the peek. */
+    // 屏蔽 IRQ 后重新读取完成状态。
     result = t->irq_result;
     __DMB();
     elapsed = HAL_GetTick() - t->started;
@@ -168,7 +169,7 @@ void stm_lcd_spi_f4_poll(stm_lcd_spi_f4_t *t)
         if (!stop_transfer(t))
             return;
     }
-    release_bus(t); /* Wire and DMA are quiescent before ownership is returned. */
+    release_bus(t); // 确认 SPI 和 DMA 停止后才归还所有权。
     t->active = 0;
     t->irq_result = 0;
     t->stats.total_ms += elapsed;
@@ -178,5 +179,5 @@ void stm_lcd_spi_f4_poll(stm_lcd_spi_f4_t *t)
         ++t->stats.completed;
     clear_pending_irqs(t);
     unmask_irqs(t);
-    (void)stm_lcd_io_complete(&t->io, err); /* Main loop, DMA and wire stopped. */
+    (void)stm_lcd_io_complete(&t->io, err); // 仅在主循环通知安全完成。
 }

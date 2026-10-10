@@ -1,3 +1,7 @@
+/**
+ * @file    test_contracts.c
+ * @brief   验证组件主机回归，不替代实板验收。
+ */
 #include "stm_lcd_impl.h"
 #include <assert.h>
 #include <string.h>
@@ -141,7 +145,7 @@ int main(void)
     hardware_busy = 0;
     unsafe_submit = 0;
     assert(stm_lcd_io_complete(&io, STM_ERR_IO) == STM_OK && completions == 2);
-    hardware_busy = 1; /* Reject another submit until hardware stops. */
+    hardware_busy = 1; // 硬件停止前拒绝再次提交。
     assert(stm_lcd_panel_draw_bitmap_async(&panel, 0, 0, 1, 1, &pixel) == STM_ERR_INVALID_STATE);
     hardware_busy = 0;
     inline_done = 1;

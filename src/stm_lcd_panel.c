@@ -1,3 +1,7 @@
+/**
+ * @file    stm_lcd_panel.c
+ * @brief   实现面板操作校验及刷新所有权。
+ */
 #include "stm_lcd_impl.h"
 
 static void io_complete(void *context, stm_err_t result)
