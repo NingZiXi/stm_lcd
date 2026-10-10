@@ -28,3 +28,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../stm_lcd_axs15231b/src/stm_lcd_axs15
 else()
     message(STATUS "AXS constructor integration tests require sibling panel and touch components")
 endif()
+
+add_executable(test_framebuffer test_framebuffer.c)
+target_link_libraries(test_framebuffer PRIVATE stm_lcd)
+add_test(NAME framebuffer_and_register_contracts COMMAND test_framebuffer)

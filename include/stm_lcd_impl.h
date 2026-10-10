@@ -16,10 +16,20 @@ typedef struct
     stm_err_t (*tx_color_async)(void *, uint8_t, const void *,
                                 size_t);                 // 硬件停止前保留像素。
     stm_err_t (*write)(void *, const uint8_t *, size_t); // 独立原始 I2C 写事务，结束产生 STOP。
-    stm_err_t (*read)(void *, uint8_t *, size_t);        // 独立原始 I2C 读事务。
-    stm_err_t (*probe)(void *);                          // 可选探测，不复位设备。
-    void (*process)(void *);                             // 主循环完成及超时服务。
-    int (*busy)(void *);                                 // 硬件访问保护；停止后返回零。
+    stm_err_t (*read)(void *, uint8_t *, size_t); // 独立原始 I2C 读事务。
+    stm_err_t (*probe)(void *);                   // 可选探测，不复位设备。
+    void (*process)(void *);                      // 主循环完成及超时服务。
+    stm_err_t (*draw_region)(
+        void *, uint16_t, uint16_t, uint16_t, uint16_t, const void *); // 同步复制紧密 RGB565 区域。
+    stm_err_t (*present)(void *,
+                         const void *,
+                         uint16_t,
+                         uint16_t);    // VSYNC 提交整帧；完成释放旧扫描帧。
+    stm_err_t (*stop_scanout)(void *); // 同步停止扫描，成功后不再引用任何帧。
+    stm_err_t (*read_reg)(
+        void *, uint16_t, uint8_t, uint8_t *, size_t); // 原子寄存器读，地址宽度为 1/2 字节。
+    stm_err_t (*write_reg)(void *, uint16_t, uint8_t, const uint8_t *, size_t); // 原子寄存器写。
+    int (*busy)(void *); // 硬件访问保护；停止后返回零。
 } stm_lcd_io_ops_t;
 
 struct stm_lcd_io
@@ -32,6 +42,8 @@ struct stm_lcd_io
     void *read_context;                     // 借用的观察上下文。
     uint16_t borrowers;                     // 设备借用计数，非零时禁止清除 IO。
     uint8_t pending, dispatching;           // 在途及回调保护，仅主循环访问。
+    stm_err_t frame_error; // 整帧请求首个错误，停止失败后仍保留。
+    uint8_t scanout;       // 保守标记扫描缓冲借用，停止成功后才清零。
 };
 
 typedef struct
@@ -48,7 +60,8 @@ typedef struct
                             uint16_t,
                             uint16_t,
                             uint16_t,
-                            const void *);   // 安全完成前借用像素。
+                            const void *);                      // 安全完成前借用像素。
+    stm_err_t (*present)(stm_lcd_panel_handle_t, const void *); // 可选整帧异步提交。
     void (*destroy)(stm_lcd_panel_handle_t); // 仅释放实现对象，不删除 IO。
 } stm_lcd_panel_ops_t;
 

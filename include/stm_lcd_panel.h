@@ -146,6 +146,33 @@ stm_err_t stm_lcd_panel_get_size(stm_lcd_panel_handle_t panel, uint16_t *width, 
  * @return STM_OK；在途、回调或仍被订阅时返回 STM_ERR_INVALID_STATE。
  */
 stm_err_t stm_lcd_panel_delete(stm_lcd_panel_handle_t *panel);
+
+/**
+ * @brief 查询面板同步区域绘图能力。
+ * @param panel 面板句柄
+ * @return 非零表示实现同步 draw。
+ */
+int stm_lcd_panel_supports_draw(stm_lcd_panel_handle_t panel);
+/**
+ * @brief 查询面板安全整帧提交能力。
+ * @param panel 面板句柄
+ * @return 非零表示支持 present 与 IO 安全停止。
+ */
+int stm_lcd_panel_supports_present(stm_lcd_panel_handle_t panel);
+/**
+ * @brief 提交完整 RGB565 帧，异步完成时旧扫描帧可复用，新帧仍被扫描。
+ * @param panel 空闲且已初始化面板
+ * @param pixels 面板尺寸的整帧首地址
+ * @return STM_OK 或错误；忙时必须继续完成服务，禁止复用或删除。
+ */
+stm_err_t stm_lcd_panel_present(stm_lcd_panel_handle_t panel, const void *pixels);
+/**
+ * @brief 空闲时安全停止扫描，解除全部扫描缓冲借用。
+ * @param panel 面板句柄
+ * @return STM_OK 或平台停止错误，失败不解除借用。
+ */
+stm_err_t stm_lcd_panel_stop_scanout(stm_lcd_panel_handle_t panel);
+
 #ifdef __cplusplus
 }
 #endif

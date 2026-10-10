@@ -2,6 +2,8 @@
 
 [![version 1.0.0](https://img.shields.io/badge/version-1.0.0-5364b5?style=flat-square)](https://github.com/NingZiXi/stm_lcd/releases/tag/v1.0.0)
 
+**当前提交与正式版本：** 本 README 含未发布的帧缓冲与原子寄存器扩展（`STM_LCD_FRAMEBUFFER_API=1`）；上方 v1.0.0 徽章仍指向正式基线，该 tag 不具备新增能力。迁移驱动/port 需同时提供匹配的框架提交，聚合仓库 gitlink 固定配套组合。扩展已用于 2026-10-11 H757 + ILI9881C/GT9271 的 DIRECT 诊断 Debug 显示/触摸及五次软件复位回归；仅代表该消费组合，不代表所有后端或原 v1.0.0。迁移提交已同步 GitHub/Gitee，尚未发布包含扩展的新 tag 或 Release。
+
 显示领域的轻量公共框架，将 IO、面板和触摸接口放在**一个组件**中。仅依赖 `stm_common` 的错误定义，不依赖 HAL、LVGL、日志或 RTOS；不提供设备注册中心、后台任务或通用事件队列。
 
 ## 🤖 让 Agent 帮助接入
@@ -57,9 +59,9 @@ target_link_libraries(your_firmware PRIVATE stm_lcd_spi_f4 stm_lcd_i2c_f4)
 3. 按模组要求协调复位、初始化面板并开启显示；共享复位不能在接入后随意操作。
 4. 直接使用通用接口，或将设备和静态缓冲交给 `stm_lvgl_port`。
 5. 主循环持续服务 `stm_lcd_io_process()`；使用 port 时由其自动服务，不重复轮询。
-6. 停止新提交并服务所有在途请求；先删除 port，再删除设备，最后 deinit IO。
+6. 停止新提交并服务所有在途请求；整帧扫描还须 stop_scanout 成功。先删除 port，再删除设备，最后 deinit IO。
 
-具体可运行接入片段见两个驱动的 README 和示例；该框架不猜测引脚，也不创建芯片对象。
+具体接入片段见所选芯片驱动的 README 和示例；该框架不猜测引脚，也不创建芯片对象。
 
 ## 公共契约
 
@@ -117,3 +119,21 @@ ctest --test-dir build/tests --output-on-failure
 该结果不等于其他模组、其他 MCU 或长时间稳定性验收；既有触摸畸形帧问题不能标记为已修复。当前正式版本为 `v1.0.0`，统一接口不兼容重构前 API；接入时以该版本公开头文件为准，不将旧版本的接口或验收结论套用到本版本。
 
 维护者的 MIT 许可证保持原内容，见 [LICENSE](LICENSE)。源码中已有的第三方来源及许可说明保持保留。Agent 工作约束见 [AGENTS.md](AGENTS.md)。
+
+## 工作区新增的可选 IO 能力
+
+公开使用者接口声明见 `stm_lcd_io.h/stm_lcd_panel.h`，实现者操作表见 `stm_lcd_impl.h`。未实现操作返回 NOT_SUPPORTED，不要求现有 AXS/SPI 必须增加扫描能力。
+
+| 能力 | 语义 |
+| --- | --- |
+| read_reg/write_reg | 原子寄存器事务，地址宽度 1/2 字节；保持 repeated-start/HAL Mem 语义 |
+| draw_region | 同步复制半开矩形的紧密 RGB565；输入返回后可复用 |
+| present | 异步提交完整紧密 RGB565；要求 process/busy/stop_scanout 全部提供 |
+| supports_draw/supports_present | 查询通用面板能力，不判断芯片名 |
+| stop_scanout | 同步停止所有扫描/预取；成功后不再引用任何帧 |
+
+原始 write/read 保持独立 STOP 事务，用于 AXS 协议；不要用它们模拟 FT/GT 原子寄存器事务。read_reg 成功通知同一读取观察者，失败不通知；观察回调禁止重入。现有 F4 原始 I2C 适配不含 Mem 操作，FT/GT 的 H7 示例提供了对应实现，其他平台应按实际 HAL 提供。
+
+present 成功完成后旧扫描帧可复用，新帧仍被借用；busy 仅表示换帧在途，另有 scanout 所有权保护。提交错误且硬件忙时继续 process；完成错误必须确认 stop 成功再通知，停止失败保留 pending 和首个错误，稍后重试完成不能覆盖该错误。删除、deinit、reset、init 在扫描仍借用时拒绝。
+
+框架不实现 VSYNC、缓存或自动恢复。平台主循环在安全时调用 complete 一次，ISR 只记录邮箱。模型测试见 `tests/test_framebuffer.c`，真实 LVGL/PARTIAL/DIRECT 回归在同级 port 的 `tests/real_lvgl`；不代表实际 MCU/显示板通过。
