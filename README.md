@@ -1,8 +1,8 @@
 # stm_lcd
 
-[![version 1.0.0](https://img.shields.io/badge/version-1.0.0-5364b5?style=flat-square)](https://github.com/NingZiXi/stm_lcd/releases/tag/v1.0.0)
+[![version 1.1.0](https://img.shields.io/badge/version-1.1.0-5364b5?style=flat-square)](https://github.com/NingZiXi/stm_lcd/releases/tag/v1.1.0)
 
-**当前提交与正式版本：** 本 README 含未发布的帧缓冲与原子寄存器扩展（`STM_LCD_FRAMEBUFFER_API=1`）；上方 v1.0.0 徽章仍指向正式基线，该 tag 不具备新增能力。迁移驱动/port 需同时提供匹配的框架提交，聚合仓库 gitlink 固定配套组合。扩展已用于 2026-10-11 H757 + ILI9881C/GT9271 的 DIRECT 诊断 Debug 显示/触摸及五次软件复位回归；仅代表该消费组合，不代表所有后端或原 v1.0.0。迁移提交已同步 GitHub/Gitee，尚未发布包含扩展的新 tag 或 Release。
+**版本边界：** `v1.1.0` 在 `v1.0.0` 公共接口上兼容新增帧缓冲与原子寄存器扩展（`STM_LCD_FRAMEBUFFER_API=1`）。迁移后的 ILI9881C、FT5206、GT9271 和 DIRECT port 需要本版本或具备相同能力的源码；旧 `v1.0.0` tag 保留且不具备扩展。配套组合由聚合仓库 gitlink 固定。扩展已用于 2026-10-11 H757 + ILI9881C/GT9271 的 DIRECT 诊断 Debug 显示/触摸及五次软件复位回归；不代表所有后端均已实板验证。
 
 显示领域的轻量公共框架，将 IO、面板和触摸接口放在**一个组件**中。仅依赖 `stm_common` 的错误定义，不依赖 HAL、LVGL、日志或 RTOS；不提供设备注册中心、后台任务或通用事件队列。
 
