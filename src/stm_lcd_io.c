@@ -1,0 +1,146 @@
+#include "stm_lcd_impl.h"
+#include <string.h>
+
+stm_err_t stm_lcd_io_init(stm_lcd_io_handle_t io, const stm_lcd_io_ops_t *ops, void *context)
+{
+    if (!io || !ops)
+        return STM_ERR_INVALID_ARG;
+    if (io->ops)
+        return STM_ERR_INVALID_STATE;
+    io->ops = ops;
+    io->context = context;
+    return STM_OK;
+}
+
+int stm_lcd_io_busy(stm_lcd_io_handle_t io)
+{
+    return io && (io->pending || (io->ops && io->ops->busy && io->ops->busy(io->context)));
+}
+
+int stm_lcd_io_supports_async(stm_lcd_io_handle_t io)
+{
+    return io && io->ops && io->ops->tx_color_async && io->ops->process;
+}
+
+stm_err_t stm_lcd_io_complete(stm_lcd_io_handle_t io, stm_err_t result)
+{
+    if (!io || !io->ops)
+        return STM_ERR_INVALID_ARG;
+    if (!io->pending || io->dispatching || (io->ops->busy && io->ops->busy(io->context)))
+        return STM_ERR_INVALID_STATE;
+    io->pending = 0;
+    io->dispatching = 1;
+    if (io->complete)
+        io->complete(io->owner, result);
+    io->dispatching = 0;
+    return STM_OK;
+}
+
+static stm_err_t check(stm_lcd_io_handle_t io)
+{
+    if (!io || !io->ops)
+        return STM_ERR_INVALID_ARG;
+    return stm_lcd_io_busy(io) || io->dispatching ? STM_ERR_INVALID_STATE : STM_OK;
+}
+
+stm_err_t stm_lcd_io_tx_param(stm_lcd_io_handle_t io, uint8_t cmd, const uint8_t *data, size_t n)
+{
+    stm_err_t err = check(io);
+    if (err != STM_OK)
+        return err;
+    if (n && !data)
+        return STM_ERR_INVALID_ARG;
+    return io->ops->tx_param ? io->ops->tx_param(io->context, cmd, data, n) : STM_ERR_NOT_SUPPORTED;
+}
+
+stm_err_t stm_lcd_io_tx_color(stm_lcd_io_handle_t io, uint8_t cmd, const void *data, size_t n)
+{
+    stm_err_t err = check(io);
+    if (err != STM_OK)
+        return err;
+    if (!data || !n)
+        return STM_ERR_INVALID_ARG;
+    return io->ops->tx_color ? io->ops->tx_color(io->context, cmd, data, n) : STM_ERR_NOT_SUPPORTED;
+}
+
+stm_err_t stm_lcd_io_tx_color_async(stm_lcd_io_handle_t io, uint8_t cmd, const void *data, size_t n)
+{
+    stm_err_t err = check(io);
+    if (err != STM_OK)
+        return err;
+    if (!data || !n)
+        return STM_ERR_INVALID_ARG;
+    if (!stm_lcd_io_supports_async(io))
+        return STM_ERR_NOT_SUPPORTED;
+    io->pending = 1;
+    err = io->ops->tx_color_async(io->context, cmd, data, n);
+    /* Defensive fallback: a broken adapter must not release a live DMA buffer. */
+    if (err != STM_OK && io->pending && (!io->ops->busy || !io->ops->busy(io->context)))
+        io->pending = 0;
+    return err;
+}
+
+stm_err_t stm_lcd_io_write(stm_lcd_io_handle_t io, const uint8_t *data, size_t n)
+{
+    stm_err_t err = check(io);
+    if (err != STM_OK)
+        return err;
+    if (!data || !n)
+        return STM_ERR_INVALID_ARG;
+    return io->ops->write ? io->ops->write(io->context, data, n) : STM_ERR_NOT_SUPPORTED;
+}
+
+stm_err_t stm_lcd_io_read(stm_lcd_io_handle_t io, uint8_t *data, size_t n)
+{
+    stm_err_t err = check(io);
+    if (err != STM_OK)
+        return err;
+    if (!data || !n)
+        return STM_ERR_INVALID_ARG;
+    if (!io->ops->read)
+        return STM_ERR_NOT_SUPPORTED;
+    err = io->ops->read(io->context, data, n);
+    if (err == STM_OK && io->read_observer)
+    {
+        io->dispatching = 1;
+        io->read_observer(io->read_context, data, n);
+        io->dispatching = 0;
+    }
+    return err;
+}
+
+stm_err_t stm_lcd_io_probe(stm_lcd_io_handle_t io)
+{
+    stm_err_t err = check(io);
+    if (err != STM_OK)
+        return err;
+    return io->ops->probe ? io->ops->probe(io->context) : STM_ERR_NOT_SUPPORTED;
+}
+
+void stm_lcd_io_process(stm_lcd_io_handle_t io)
+{
+    if (io && io->ops && !io->dispatching && io->ops->process)
+        io->ops->process(io->context);
+}
+
+stm_err_t
+stm_lcd_io_set_read_observer(stm_lcd_io_handle_t io, stm_lcd_read_observer_cb cb, void *context)
+{
+    stm_err_t err = check(io);
+    if (err != STM_OK)
+        return err;
+    io->read_observer = cb;
+    io->read_context = context;
+    return STM_OK;
+}
+
+stm_err_t stm_lcd_io_deinit(stm_lcd_io_handle_t io)
+{
+    stm_err_t err = check(io);
+    if (err != STM_OK)
+        return err;
+    if (io->borrowers || io->complete)
+        return STM_ERR_INVALID_STATE;
+    memset(io, 0, sizeof(*io));
+    return STM_OK;
+}
